@@ -340,6 +340,16 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/shop',
+    name: 'Shop',
+    component: () => import('@/views/user/ShopView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: '购买',
+    }
+  },
+  {
     path: '/custom/:id',
     name: 'CustomPage',
     component: () => import('@/views/user/CustomPageView.vue'),
