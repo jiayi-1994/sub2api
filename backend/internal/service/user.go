@@ -66,6 +66,16 @@ func (u *User) IsAdmin() bool {
 	return u.Role == RoleAdmin
 }
 
+// IsViewer 只读管理员：可访问仪表盘与使用记录，但不能执行任何写操作。
+func (u *User) IsViewer() bool {
+	return u.Role == RoleViewer
+}
+
+// IsAdminOrViewer 用于鉴权放行（admin 全权限，viewer 由后续中间件再做白名单限制）。
+func (u *User) IsAdminOrViewer() bool {
+	return u.IsAdmin() || u.IsViewer()
+}
+
 func (u *User) IsActive() bool {
 	return u.Status == StatusActive
 }

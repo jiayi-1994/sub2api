@@ -745,12 +745,12 @@ router.beforeEach((to, _from, next) => {
     if (authStore.isAuthenticated && (to.path === '/login' || to.path === '/register')) {
       // In backend mode, non-admin users should NOT be redirected away from login
       // (they are blocked from all protected routes, so redirecting would cause a loop)
-      if (appStore.backendModeEnabled && !authStore.isAdmin) {
+      if (appStore.backendModeEnabled && !authStore.canAccessAdmin) {
         next()
         return
       }
-      // Admin users go to admin dashboard, regular users go to user dashboard
-      next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+      // Admin/viewer users go to admin dashboard, regular users go to user dashboard
+      next(authStore.canAccessAdmin ? '/admin/dashboard' : '/dashboard')
       return
     }
     // Backend mode: block public pages for unauthenticated users (except login, key-usage, setup)
@@ -776,10 +776,21 @@ router.beforeEach((to, _from, next) => {
   }
 
   // Check admin requirement
-  if (requiresAdmin && !authStore.isAdmin) {
-    // User is authenticated but not admin, redirect to user dashboard
-    next('/dashboard')
-    return
+  if (requiresAdmin) {
+    // Viewer 只读管理员：仅允许 /admin/dashboard 与 /admin/usage
+    const viewerAllowedPaths = ['/admin/dashboard', '/admin/usage']
+    const isViewerAllowedPath = viewerAllowedPaths.some(
+      (p) => to.path === p || to.path.startsWith(`${p}/`)
+    )
+    if (authStore.isViewer && !isViewerAllowedPath) {
+      next('/admin/dashboard')
+      return
+    }
+    if (!authStore.canAccessAdmin) {
+      // User is authenticated but cannot access admin, redirect to user dashboard
+      next('/dashboard')
+      return
+    }
   }
 
 
@@ -787,7 +798,7 @@ router.beforeEach((to, _from, next) => {
   if (to.meta.requiresPayment) {
     const paymentEnabled = appStore.cachedPublicSettings?.payment_enabled
     if (!paymentEnabled) {
-      next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+      next(authStore.canAccessAdmin ? '/admin/dashboard' : '/dashboard')
       return
     }
   }
@@ -795,7 +806,12 @@ router.beforeEach((to, _from, next) => {
   if (to.meta.requiresRiskControl) {
     const riskControlEnabled = appStore.cachedPublicSettings?.risk_control_enabled === true
     if (!riskControlEnabled) {
-      next(authStore.isAdmin ? '/admin/settings' : '/dashboard')
+      // viewer 不可访问 settings，统一回 /admin/dashboard
+      if (authStore.isAdmin) {
+        next('/admin/settings')
+      } else {
+        next(authStore.isViewer ? '/admin/dashboard' : '/dashboard')
+      }
       return
     }
   }
@@ -812,14 +828,14 @@ router.beforeEach((to, _from, next) => {
 
     if (restrictedPaths.some((path) => to.path.startsWith(path))) {
       // 简易模式下访问受限页面,重定向到仪表板
-      next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+      next(authStore.canAccessAdmin ? '/admin/dashboard' : '/dashboard')
       return
     }
   }
 
-  // Backend mode: admin gets full access, non-admin blocked
+  // Backend mode: admin/viewer gets access, others blocked
   if (appStore.backendModeEnabled) {
-    if (authStore.isAuthenticated && authStore.isAdmin) {
+    if (authStore.isAuthenticated && authStore.canAccessAdmin) {
       next()
       return
     }

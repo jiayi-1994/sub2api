@@ -12,8 +12,9 @@ const (
 
 // Role constants
 const (
-	RoleAdmin = "admin"
-	RoleUser  = "user"
+	RoleAdmin  = "admin"
+	RoleUser   = "user"
+	RoleViewer = "viewer" // 只读管理员：访问仪表盘和使用记录，禁止任何写操作
 )
 
 // Platform constants

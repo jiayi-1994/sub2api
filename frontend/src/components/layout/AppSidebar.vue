@@ -24,7 +24,7 @@
     <!-- Navigation -->
     <nav class="sidebar-nav scrollbar-hide">
       <!-- Admin View: Admin menu first, then personal menu -->
-      <template v-if="isAdmin">
+      <template v-if="showAdminNav">
         <!-- Admin Section -->
         <div class="sidebar-section">
           <template v-for="item in adminNavItems" :key="item.path">
@@ -93,8 +93,8 @@
           </template>
         </div>
 
-        <!-- Personal Section for Admin (hidden in simple mode) -->
-        <div v-if="!authStore.isSimpleMode" class="sidebar-section">
+        <!-- Personal Section for Admin (hidden in simple mode and for viewer role) -->
+        <div v-if="!authStore.isSimpleMode && !isViewer" class="sidebar-section">
           <div class="sidebar-section-title" :class="{ 'sidebar-section-title-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
             <span class="sidebar-section-title-text" :class="{ 'sidebar-section-title-text-collapsed': sidebarCollapsed }">
               {{ t('nav.myAccount') }}
@@ -236,6 +236,9 @@ const adminSettingsStore = useAdminSettingsStore()
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const mobileOpen = computed(() => appStore.mobileOpen)
 const isAdmin = computed(() => authStore.isAdmin)
+const isViewer = computed(() => authStore.isViewer)
+// 顶部导航：admin 与 viewer 都进入管理员视图（viewer 只看到 dashboard + usage）
+const showAdminNav = computed(() => isAdmin.value || isViewer.value)
 const isDark = ref(document.documentElement.classList.contains('dark'))
 
 // Track which parent nav groups are expanded
@@ -716,6 +719,13 @@ const customMenuItemsForAdmin = computed(() => {
 
 // Admin navigation items
 const adminNavItems = computed((): NavItem[] => {
+  // 只读管理员：仅看到仪表盘与使用记录
+  if (isViewer.value) {
+    return [
+      { path: '/admin/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
+      { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon },
+    ]
+  }
   const baseItems: NavItem[] = [
     { path: '/admin/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
     { path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon, featureFlag: flagOpsMonitoring },

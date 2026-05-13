@@ -187,8 +187,8 @@ func validateJWTForAdmin(
 		return false
 	}
 
-	// 检查管理员权限
-	if !user.IsAdmin() {
+	// 检查管理员权限（含只读管理员 viewer；viewer 的写操作由 ViewerReadOnly 中间件拦截）
+	if !user.IsAdminOrViewer() {
 		AbortWithError(c, 403, "FORBIDDEN", "Admin access required")
 		return false
 	}

@@ -90,6 +90,15 @@ export const useAuthStore = defineStore('auth', () => {
     return user.value?.role === 'admin'
   })
 
+  // 只读管理员：可查看仪表盘和使用记录，不能执行任何写操作。
+  const isViewer = computed(() => {
+    return user.value?.role === 'viewer'
+  })
+
+  // 是否可进入 /admin/* 区域（管理员或只读管理员）。
+  // 注意：不要将 viewer 并入 isAdmin —— 现有 isAdmin 用于决定写 UI 是否展示。
+  const canAccessAdmin = computed(() => isAdmin.value || isViewer.value)
+
   const isSimpleMode = computed(() => runMode.value === 'simple')
   const hasPendingAuthSession = computed(() => pendingAuthSession.value !== null)
 
@@ -476,6 +485,8 @@ export const useAuthStore = defineStore('auth', () => {
     // Computed
     isAuthenticated,
     isAdmin,
+    isViewer,
+    canAccessAdmin,
     isSimpleMode,
     hasPendingAuthSession,
 
