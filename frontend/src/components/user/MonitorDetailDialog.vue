@@ -75,6 +75,7 @@ const props = defineProps<{
   show: boolean
   monitorId: number | null
   title: string
+  fetcher?: (id: number) => Promise<UserMonitorDetail>
 }>()
 
 defineEmits<{
@@ -92,7 +93,8 @@ async function load(id: number) {
   detail.value = null
   loading.value = true
   try {
-    detail.value = await fetchChannelMonitorDetail(id)
+    const fetcher = props.fetcher ?? fetchChannelMonitorDetail
+    detail.value = await fetcher(id)
   } catch (err: unknown) {
     appStore.showError(extractApiErrorMessage(err, t('channelStatus.detailLoadError')))
   } finally {

@@ -956,6 +956,14 @@ export default {
     }
   },
 
+  // Public Monitoring page (unauthenticated /monitoring)
+  publicMonitoring: {
+    title: '渠道监控',
+    subtitle: '渠道可用性 · 公开状态页',
+    loadError: '加载状态失败',
+    disabled: '公开监控页已被管理员关闭。'
+  },
+
   // Available Channels (user-facing)
   availableChannels: {
     title: '可用渠道',
@@ -5267,6 +5275,8 @@ export default {
           enabledHint: '关闭后后台不再执行定时检测，已有数据保留。',
           defaultInterval: '默认检测间隔（秒）',
           defaultIntervalHint: '新建渠道监控时表单的默认值，可被单个渠道覆盖。范围 15 – 3600 秒。',
+          publicEnabled: '启用公开监控页（/monitoring）',
+          publicEnabledHint: '关闭后未登录访客访问 /monitoring 返回 404；公开响应已脱敏 group_name。',
         },
         availableChannels: {
           title: '可用渠道',

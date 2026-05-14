@@ -952,6 +952,14 @@ export default {
     }
   },
 
+  // Public Monitoring page (unauthenticated /monitoring)
+  publicMonitoring: {
+    title: 'Channel Monitoring',
+    subtitle: 'Channel availability · Public status page',
+    loadError: 'Failed to load status',
+    disabled: 'The public monitoring page has been disabled by the administrator.'
+  },
+
   // Available Channels (user-facing)
   availableChannels: {
     title: 'Available Channels',
@@ -5104,6 +5112,8 @@ export default {
           enabledHint: 'Disabling stops background checks; existing history is preserved.',
           defaultInterval: 'Default check interval (seconds)',
           defaultIntervalHint: 'Pre-fills the interval when creating a new monitor; each monitor can override it. Range 15 – 3600.',
+          publicEnabled: 'Enable public status page (/monitoring)',
+          publicEnabledHint: 'When off, anonymous visits to /monitoring return 404. Public responses redact group_name.',
         },
         availableChannels: {
           title: 'Available Channels',

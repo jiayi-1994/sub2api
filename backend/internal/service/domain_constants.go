@@ -304,6 +304,12 @@ const (
 	// pre-filled when creating a new channel monitor from the admin UI. Range: [15, 3600].
 	SettingKeyChannelMonitorDefaultIntervalSeconds = "channel_monitor_default_interval_seconds"
 
+	// SettingKeyChannelMonitorPublicEnabled is a DB-backed soft switch for the unauthenticated
+	// public monitoring page (/monitoring). When false: public endpoint returns 404 / hidden.
+	// Independent of SettingKeyChannelMonitorEnabled — public requires both to be true.
+	// Defaults to true (opt-out).
+	SettingKeyChannelMonitorPublicEnabled = "channel_monitor_public_enabled"
+
 	// SettingKeyAvailableChannelsEnabled is a DB-backed soft switch for the "Available Channels"
 	// user-facing aggregate view. When false: user endpoint returns an empty list and the
 	// sidebar entry is hidden. Defaults to false (opt-in feature).

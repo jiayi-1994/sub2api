@@ -153,6 +153,16 @@ const routes: RouteRecordRaw[] = [
       title: 'Legal Document'
     }
   },
+  {
+    path: '/monitoring',
+    name: 'PublicMonitoring',
+    component: () => import('@/views/public/ChannelMonitoringView.vue'),
+    meta: {
+      requiresAuth: false,
+      title: 'Channel Monitoring',
+      titleKey: 'publicMonitoring.title',
+    }
+  },
 
   // ==================== User Routes ====================
   {
