@@ -5590,6 +5590,9 @@ export default {
         description: 'Default values for new users',
         defaultBalance: 'Default Balance',
         defaultBalanceHint: 'Initial balance for new users',
+        globalBillingRateMultiplier: 'Global Billing Discount Multiplier',
+        globalBillingRateMultiplierHint:
+          'Hidden from regular users. Multiplies input, output, cache, and other costs before saving usage logs and deducting balances. 1 = no discount, 0.5 = half price globally, 0 = no user-side charge.',
         affiliateRebateRate: 'Affiliate Rebate Rate',
         affiliateRebateRateHint:
           'Rebate percentage credited to inviter after recharge (0-100%, e.g. 10 means 10%)',

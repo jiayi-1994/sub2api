@@ -5779,6 +5779,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	}
 
 	// Determine billing type
+	applyGlobalBillingRateMultiplier(cost, resolveGlobalBillingRateMultiplier(ctx, s.settingService))
 	isSubscriptionBilling := subscription != nil && apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
 	billingType := BillingTypeBalance
 	if isSubscriptionBilling {

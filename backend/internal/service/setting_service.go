@@ -157,6 +157,15 @@ const openAIAllowCodexPluginCacheTTL = 60 * time.Second
 const openAIAllowCodexPluginErrorTTL = 5 * time.Second
 const openAIAllowCodexPluginDBTimeout = 5 * time.Second
 
+type cachedGlobalBillingRateMultiplier struct {
+	value     float64
+	expiresAt int64 // unix nano
+}
+
+const globalBillingRateMultiplierCacheTTL = 60 * time.Second
+const globalBillingRateMultiplierErrorTTL = 5 * time.Second
+const globalBillingRateMultiplierDBTimeout = 5 * time.Second
+
 const openAIQuotaAutoPauseSettingsCacheTTL = 60 * time.Second
 const openAIQuotaAutoPauseSettingsErrorTTL = 5 * time.Second
 const openAIQuotaAutoPauseSettingsDBTimeout = 5 * time.Second
@@ -187,6 +196,8 @@ type SettingService struct {
 	openAICodexUASF             singleflight.Group
 	openAIAllowCodexPluginCache atomic.Value // *cachedOpenAIAllowCodexPlugin
 	openAIAllowCodexPluginSF    singleflight.Group
+	globalBillingRateCache      atomic.Value // *cachedGlobalBillingRateMultiplier
+	globalBillingRateSF         singleflight.Group
 
 	// openAIQuotaAutoPauseSettingsCache holds the most recently observed quota auto-pause
 	// settings. GetOpenAIQuotaAutoPauseSettings reads this atomic.Value on the request hot
@@ -1110,6 +1121,79 @@ func (s *SettingService) IsOpenAIAllowClaudeCodeCodexPluginEnabled(ctx context.C
 	return false
 }
 
+func normalizeGlobalBillingRateMultiplier(value float64) float64 {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return 1.0
+	}
+	if value < 0 {
+		return 0
+	}
+	return value
+}
+
+func parseGlobalBillingRateMultiplier(raw string) float64 {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 1.0
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 1.0
+	}
+	return normalizeGlobalBillingRateMultiplier(value)
+}
+
+// GetGlobalBillingRateMultiplier returns the hidden global billing discount multiplier.
+// It is intentionally not part of public settings: ordinary users only see already-discounted
+// usage log costs and deductions.
+func (s *SettingService) GetGlobalBillingRateMultiplier(ctx context.Context) float64 {
+	if s == nil || s.settingRepo == nil {
+		return 1.0
+	}
+	if cached, ok := s.globalBillingRateCache.Load().(*cachedGlobalBillingRateMultiplier); ok && cached != nil {
+		if time.Now().UnixNano() < cached.expiresAt {
+			return cached.value
+		}
+	}
+
+	result, _, _ := s.globalBillingRateSF.Do("global_billing_rate_multiplier", func() (any, error) {
+		if cached, ok := s.globalBillingRateCache.Load().(*cachedGlobalBillingRateMultiplier); ok && cached != nil {
+			if time.Now().UnixNano() < cached.expiresAt {
+				return cached.value, nil
+			}
+		}
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		dbCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), globalBillingRateMultiplierDBTimeout)
+		defer cancel()
+		raw, err := s.settingRepo.GetValue(dbCtx, SettingKeyGlobalBillingRateMultiplier)
+		if err != nil {
+			ttl := globalBillingRateMultiplierErrorTTL
+			if errors.Is(err, ErrSettingNotFound) {
+				ttl = globalBillingRateMultiplierCacheTTL
+			} else {
+				slog.Warn("failed to get global billing rate multiplier setting, defaulting to 1.0", "error", err)
+			}
+			s.globalBillingRateCache.Store(&cachedGlobalBillingRateMultiplier{
+				value:     1.0,
+				expiresAt: time.Now().Add(ttl).UnixNano(),
+			})
+			return 1.0, nil
+		}
+		value := parseGlobalBillingRateMultiplier(raw)
+		s.globalBillingRateCache.Store(&cachedGlobalBillingRateMultiplier{
+			value:     value,
+			expiresAt: time.Now().Add(globalBillingRateMultiplierCacheTTL).UnixNano(),
+		})
+		return value, nil
+	})
+	if value, ok := result.(float64); ok {
+		return value
+	}
+	return 1.0
+}
+
 // SetOnUpdateCallback sets a callback function to be called when settings are updated
 // This is used for cache invalidation (e.g., HTML cache in frontend server)
 func (s *SettingService) SetOnUpdateCallback(callback func()) {
@@ -1834,6 +1918,8 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	// 默认配置
 	updates[SettingKeyDefaultConcurrency] = strconv.Itoa(settings.DefaultConcurrency)
 	updates[SettingKeyDefaultBalance] = strconv.FormatFloat(settings.DefaultBalance, 'f', 8, 64)
+	settings.GlobalBillingRateMultiplier = normalizeGlobalBillingRateMultiplier(settings.GlobalBillingRateMultiplier)
+	updates[SettingKeyGlobalBillingRateMultiplier] = strconv.FormatFloat(settings.GlobalBillingRateMultiplier, 'f', 8, 64)
 	settings.AffiliateRebateRate = clampAffiliateRebateRate(settings.AffiliateRebateRate)
 	updates[SettingKeyAffiliateRebateRate] = strconv.FormatFloat(settings.AffiliateRebateRate, 'f', 8, 64)
 	if settings.AffiliateRebateFreezeHours < 0 {
@@ -2064,6 +2150,11 @@ func (s *SettingService) refreshCachedSettings(settings *SystemSettings) {
 	openAIAdvancedSchedulerSettingCache.Store(&cachedOpenAIAdvancedSchedulerSetting{
 		enabled:   settings.OpenAIAdvancedSchedulerEnabled,
 		expiresAt: time.Now().Add(openAIAdvancedSchedulerSettingCacheTTL).UnixNano(),
+	})
+	s.globalBillingRateSF.Forget("global_billing_rate_multiplier")
+	s.globalBillingRateCache.Store(&cachedGlobalBillingRateMultiplier{
+		value:     normalizeGlobalBillingRateMultiplier(settings.GlobalBillingRateMultiplier),
+		expiresAt: time.Now().Add(globalBillingRateMultiplierCacheTTL).UnixNano(),
 	})
 	// Invalidate the quota auto-pause cache and let the next read trigger a fresh load.
 	// We can't know from here whether ops_advanced_settings was also touched, so be
@@ -2746,6 +2837,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyOIDCConnectUserInfoUsernamePath:           "",
 		SettingKeyDefaultConcurrency:                        strconv.Itoa(s.cfg.Default.UserConcurrency),
 		SettingKeyDefaultBalance:                            strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
+		SettingKeyGlobalBillingRateMultiplier:               "1.00000000",
 		SettingKeyAffiliateRebateRate:                       strconv.FormatFloat(AffiliateRebateRateDefault, 'f', 8, 64),
 		SettingKeyAffiliateRebateFreezeHours:                strconv.Itoa(AffiliateRebateFreezeHoursDefault),
 		SettingKeyAffiliateRebateDurationDays:               strconv.Itoa(AffiliateRebateDurationDaysDefault),
@@ -2920,6 +3012,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	} else {
 		result.DefaultBalance = s.cfg.Default.UserBalance
 	}
+	result.GlobalBillingRateMultiplier = parseGlobalBillingRateMultiplier(settings[SettingKeyGlobalBillingRateMultiplier])
 	if rebateRate, err := strconv.ParseFloat(settings[SettingKeyAffiliateRebateRate], 64); err == nil {
 		result.AffiliateRebateRate = clampAffiliateRebateRate(rebateRate)
 	} else {

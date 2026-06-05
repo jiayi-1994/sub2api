@@ -193,6 +193,73 @@ func TestGatewayServiceRecordUsage_PreservesRequestedAndUpstreamModels(t *testin
 	require.Equal(t, mappedModel, *usageRepo.lastLog.UpstreamModel)
 }
 
+func TestGatewayServiceRecordUsage_AppliesGlobalBillingRateMultiplierToUsageLogAndBilling(t *testing.T) {
+	const globalMultiplier = 0.5
+	groupRate := 1.6
+	usage := ClaudeUsage{
+		InputTokens:              20,
+		OutputTokens:             5,
+		CacheCreationInputTokens: 4,
+		CacheReadInputTokens:     6,
+	}
+	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+	billingRepo := &openAIRecordUsageBillingRepoStub{result: &UsageBillingApplyResult{Applied: true}}
+	quotaSvc := &openAIRecordUsageAPIKeyQuotaStub{}
+	svc := newGatewayRecordUsageServiceWithBillingRepoForTest(
+		usageRepo,
+		billingRepo,
+		&openAIRecordUsageUserRepoStub{},
+		&openAIRecordUsageSubRepoStub{},
+	)
+	svc.settingService = NewSettingService(&settingRepoStub{values: map[string]string{
+		SettingKeyGlobalBillingRateMultiplier: "0.5",
+	}}, &config.Config{})
+
+	err := svc.RecordUsage(context.Background(), &RecordUsageInput{
+		Result: &ForwardResult{
+			RequestID: "gateway_global_billing_discount",
+			Usage:     usage,
+			Model:     "claude-sonnet-4",
+			Duration:  time.Second,
+		},
+		APIKey: &APIKey{
+			ID:      501,
+			Quota:   100,
+			GroupID: i64p(901),
+			Group: &Group{
+				ID:             901,
+				RateMultiplier: groupRate,
+			},
+		},
+		User:          &User{ID: 601},
+		Account:       &Account{ID: 701},
+		APIKeyService: quotaSvc,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, usageRepo.lastLog)
+	require.Equal(t, groupRate, usageRepo.lastLog.RateMultiplier)
+
+	expected, err := svc.billingService.CalculateCost("claude-sonnet-4", UsageTokens{
+		InputTokens:         usage.InputTokens,
+		OutputTokens:        usage.OutputTokens,
+		CacheCreationTokens: usage.CacheCreationInputTokens,
+		CacheReadTokens:     usage.CacheReadInputTokens,
+	}, groupRate)
+	require.NoError(t, err)
+
+	require.InDelta(t, expected.InputCost*globalMultiplier, usageRepo.lastLog.InputCost, 1e-12)
+	require.InDelta(t, expected.OutputCost*globalMultiplier, usageRepo.lastLog.OutputCost, 1e-12)
+	require.InDelta(t, expected.CacheCreationCost*globalMultiplier, usageRepo.lastLog.CacheCreationCost, 1e-12)
+	require.InDelta(t, expected.CacheReadCost*globalMultiplier, usageRepo.lastLog.CacheReadCost, 1e-12)
+	require.InDelta(t, expected.TotalCost*globalMultiplier, usageRepo.lastLog.TotalCost, 1e-12)
+	require.InDelta(t, expected.ActualCost*globalMultiplier, usageRepo.lastLog.ActualCost, 1e-12)
+
+	require.NotNil(t, billingRepo.lastCmd)
+	require.InDelta(t, usageRepo.lastLog.ActualCost, billingRepo.lastCmd.BalanceCost, 1e-12)
+	require.InDelta(t, usageRepo.lastLog.ActualCost, billingRepo.lastCmd.APIKeyQuotaCost, 1e-12)
+}
+
 func TestGatewayServiceRecordUsage_EmptyImageSizeDefaultsBeforeBillingAndPersistence(t *testing.T) {
 	imagePrice2K := 0.19
 	groupID := int64(901)

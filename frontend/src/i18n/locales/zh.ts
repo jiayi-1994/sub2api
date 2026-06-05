@@ -5748,6 +5748,8 @@ export default {
         description: '新用户的默认值',
         defaultBalance: '默认余额',
         defaultBalanceHint: '新用户的初始余额',
+        globalBillingRateMultiplier: '全局计费折扣倍率',
+        globalBillingRateMultiplierHint: '隐藏于普通用户；在保存用量记录和扣余额前统一乘到输入、输出、缓存等成本上。1 = 不打折，0.5 = 全站半价，0 = 用户侧不扣费。',
         affiliateRebateRate: '邀请返利比例',
         affiliateRebateRateHint: '充值后返给邀请人的比例（0-100%，例如填写 10 表示返利 10%）',
         defaultConcurrency: '默认并发数',

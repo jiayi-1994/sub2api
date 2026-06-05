@@ -127,6 +127,23 @@ func (s *openAIUserGroupRateRepoStub) GetByUserAndGroup(ctx context.Context, use
 	return s.rate, nil
 }
 
+type openAIRecordUsageSettingRepoStub struct {
+	SettingRepository
+
+	values map[string]string
+	err    error
+}
+
+func (s *openAIRecordUsageSettingRepoStub) GetValue(ctx context.Context, key string) (string, error) {
+	if s.err != nil {
+		return "", s.err
+	}
+	if v, ok := s.values[key]; ok {
+		return v, nil
+	}
+	return "", ErrSettingNotFound
+}
+
 func i64p(v int64) *int64 {
 	return &v
 }
@@ -335,6 +352,65 @@ func TestOpenAIGatewayServiceRecordUsage_UsesUserSpecificGroupRate(t *testing.T)
 	expected := expectedOpenAICost(t, svc, "gpt-5.1", usage, userRate)
 	require.InDelta(t, expected.ActualCost, usageRepo.lastLog.ActualCost, 1e-12)
 	require.InDelta(t, expected.ActualCost, userRepo.lastAmount, 1e-12)
+	require.Equal(t, 1, userRepo.deductCalls)
+}
+
+func TestOpenAIGatewayServiceRecordUsage_AppliesGlobalBillingRateMultiplierToUsageLogAndBalance(t *testing.T) {
+	const globalMultiplier = 0.5
+	groupID := int64(12)
+	groupRate := 1.4
+	userRate := 1.8
+	usage := OpenAIUsage{
+		InputTokens:              15,
+		OutputTokens:             4,
+		CacheCreationInputTokens: 2,
+		CacheReadInputTokens:     3,
+	}
+
+	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+	userRepo := &openAIRecordUsageUserRepoStub{}
+	subRepo := &openAIRecordUsageSubRepoStub{}
+	rateRepo := &openAIUserGroupRateRepoStub{rate: &userRate}
+	svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, subRepo, rateRepo)
+	svc.settingService = NewSettingService(&openAIRecordUsageSettingRepoStub{values: map[string]string{
+		SettingKeyGlobalBillingRateMultiplier: "0.5",
+	}}, &config.Config{})
+
+	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
+		Result: &OpenAIForwardResult{
+			RequestID: "resp_global_billing_discount",
+			Usage:     usage,
+			Model:     "gpt-5.1",
+			Duration:  time.Second,
+		},
+		APIKey: &APIKey{
+			ID:      1002,
+			GroupID: i64p(groupID),
+			Group: &Group{
+				ID:             groupID,
+				RateMultiplier: groupRate,
+			},
+		},
+		User:    &User{ID: 2002},
+		Account: &Account{ID: 3002},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, rateRepo.calls)
+	require.NotNil(t, usageRepo.lastLog)
+	require.Equal(t, userRate, usageRepo.lastLog.RateMultiplier)
+	require.Equal(t, 12, usageRepo.lastLog.InputTokens)
+	require.Equal(t, 2, usageRepo.lastLog.CacheCreationTokens)
+	require.Equal(t, 3, usageRepo.lastLog.CacheReadTokens)
+
+	expected := expectedOpenAICost(t, svc, "gpt-5.1", usage, userRate)
+	require.InDelta(t, expected.InputCost*globalMultiplier, usageRepo.lastLog.InputCost, 1e-12)
+	require.InDelta(t, expected.OutputCost*globalMultiplier, usageRepo.lastLog.OutputCost, 1e-12)
+	require.InDelta(t, expected.CacheCreationCost*globalMultiplier, usageRepo.lastLog.CacheCreationCost, 1e-12)
+	require.InDelta(t, expected.CacheReadCost*globalMultiplier, usageRepo.lastLog.CacheReadCost, 1e-12)
+	require.InDelta(t, expected.TotalCost*globalMultiplier, usageRepo.lastLog.TotalCost, 1e-12)
+	require.InDelta(t, expected.ActualCost*globalMultiplier, usageRepo.lastLog.ActualCost, 1e-12)
+	require.InDelta(t, usageRepo.lastLog.ActualCost, userRepo.lastAmount, 1e-12)
 	require.Equal(t, 1, userRepo.deductCalls)
 }
 
