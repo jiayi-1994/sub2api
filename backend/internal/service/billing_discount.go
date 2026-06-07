@@ -10,8 +10,13 @@ func resolveGlobalBillingRateMultiplier(ctx context.Context, settingService *Set
 }
 
 // applyGlobalBillingRateMultiplier folds the hidden global billing discount into
-// every customer-facing cost component before the usage log is saved and before
-// user balance/subscription/API-key quota deductions are computed.
+// total and billed costs before the usage log is saved and before user
+// balance/subscription/API-key quota deductions are computed.
+//
+// Per-token cost components intentionally stay at their pre-global-discount
+// values. The UI derives the row-level global discount from total_cost and
+// actual_cost when it needs to render discounted component costs; unit-price
+// display can then remain based on the stable pre-discount component costs.
 func applyGlobalBillingRateMultiplier(cost *CostBreakdown, multiplier float64) {
 	if cost == nil {
 		return
@@ -20,11 +25,6 @@ func applyGlobalBillingRateMultiplier(cost *CostBreakdown, multiplier float64) {
 	if multiplier == 1.0 {
 		return
 	}
-	cost.InputCost *= multiplier
-	cost.OutputCost *= multiplier
-	cost.ImageOutputCost *= multiplier
-	cost.CacheCreationCost *= multiplier
-	cost.CacheReadCost *= multiplier
 	cost.TotalCost *= multiplier
 	cost.ActualCost *= multiplier
 }

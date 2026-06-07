@@ -248,10 +248,10 @@ func TestGatewayServiceRecordUsage_AppliesGlobalBillingRateMultiplierToUsageLogA
 	}, groupRate)
 	require.NoError(t, err)
 
-	require.InDelta(t, expected.InputCost*globalMultiplier, usageRepo.lastLog.InputCost, 1e-12)
-	require.InDelta(t, expected.OutputCost*globalMultiplier, usageRepo.lastLog.OutputCost, 1e-12)
-	require.InDelta(t, expected.CacheCreationCost*globalMultiplier, usageRepo.lastLog.CacheCreationCost, 1e-12)
-	require.InDelta(t, expected.CacheReadCost*globalMultiplier, usageRepo.lastLog.CacheReadCost, 1e-12)
+	require.InDelta(t, expected.InputCost, usageRepo.lastLog.InputCost, 1e-12)
+	require.InDelta(t, expected.OutputCost, usageRepo.lastLog.OutputCost, 1e-12)
+	require.InDelta(t, expected.CacheCreationCost, usageRepo.lastLog.CacheCreationCost, 1e-12)
+	require.InDelta(t, expected.CacheReadCost, usageRepo.lastLog.CacheReadCost, 1e-12)
 	require.InDelta(t, expected.TotalCost*globalMultiplier, usageRepo.lastLog.TotalCost, 1e-12)
 	require.InDelta(t, expected.ActualCost*globalMultiplier, usageRepo.lastLog.ActualCost, 1e-12)
 

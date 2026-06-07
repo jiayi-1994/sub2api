@@ -6,6 +6,14 @@ interface TokenPriceFormatOptions {
   emptyValue?: string
 }
 
+interface UsageCostDiscountContext {
+  input_cost?: number | null
+  output_cost?: number | null
+  cache_creation_cost?: number | null
+  cache_read_cost?: number | null
+  total_cost?: number | null
+}
+
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
 }
@@ -46,4 +54,37 @@ export function formatTokenPricePerMillion(
   const fractionDigits = options.fractionDigits ?? 4
   const formatted = pricePerMillion.toFixed(fractionDigits)
   return options.withCurrencySymbol == false ? formatted : `$${formatted}`
+}
+
+export function resolveUsageCostDiscountMultiplier(context: UsageCostDiscountContext | null | undefined): number {
+  if (!context || !isFiniteNumber(context.total_cost)) {
+    return 1
+  }
+
+  const componentTotal = [
+    context.input_cost,
+    context.output_cost,
+    context.cache_creation_cost,
+    context.cache_read_cost,
+  ]
+    .filter(isFiniteNumber)
+    .reduce((sum, value) => sum + value, 0)
+
+  if (componentTotal <= 0) {
+    return 1
+  }
+
+  const multiplier = context.total_cost / componentTotal
+  return Number.isFinite(multiplier) && multiplier >= 0 ? multiplier : 1
+}
+
+export function calculateDiscountedUsageCost(
+  cost: number | null | undefined,
+  context: UsageCostDiscountContext | null | undefined
+): number {
+  if (!isFiniteNumber(cost)) {
+    return 0
+  }
+
+  return cost * resolveUsageCostDiscountMultiplier(context)
 }
