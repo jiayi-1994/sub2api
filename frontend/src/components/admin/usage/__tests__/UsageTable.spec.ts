@@ -19,8 +19,12 @@ const messages: Record<string, string> = {
   'admin.usage.outputCost': 'Output Cost',
   'admin.usage.cacheCreationCost': 'Cache Creation Cost',
   'admin.usage.cacheReadCost': 'Cache Read Cost',
+  'usage.imageInputCost': 'Image Input Cost',
+  'usage.imageOutputCost': 'Image Output Cost',
   'usage.inputTokenPrice': 'Input price',
   'usage.outputTokenPrice': 'Output price',
+  'usage.imageInputTokenPrice': 'Image input price',
+  'usage.imageOutputTokenPrice': 'Image output price',
   'usage.perMillionTokens': '/ 1M tokens',
   'usage.serviceTier': 'Service tier',
   'usage.serviceTierPriority': 'Fast',
@@ -200,6 +204,62 @@ describe('admin UsageTable tooltip', () => {
     expect(text).toContain('$5.0000 / 1M tokens')
     expect(text).toContain('$30.0000 / 1M tokens')
     expect(text).toContain('$0.069568')
+  })
+
+  it('discounts image token costs without changing their per-million token prices', async () => {
+    const row = {
+      request_id: 'req-admin-image-token-costs',
+      model: 'gpt-image-2',
+      actual_cost: 30,
+      total_cost: 30,
+      account_rate_multiplier: 1,
+      rate_multiplier: 1,
+      service_tier: null,
+      input_cost: 10,
+      output_cost: 20,
+      cache_creation_cost: 5,
+      cache_read_cost: 5,
+      image_input_cost: 15,
+      image_output_cost: 5,
+      input_tokens: 13,
+      output_tokens: 22,
+      image_input_tokens: 3,
+      image_output_tokens: 2,
+      cache_creation_tokens: 1,
+      cache_read_tokens: 1,
+      billing_mode: 'token',
+    }
+
+    const wrapper = mount(UsageTable, {
+      props: {
+        data: [row],
+        loading: false,
+        columns: [],
+      },
+      global: {
+        stubs: {
+          DataTable: DataTableStub,
+          EmptyState: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    const tooltipTriggers = wrapper.findAll('.group.relative')
+    await tooltipTriggers[tooltipTriggers.length - 1].trigger('mouseenter')
+    await nextTick()
+
+    const detailValue = (label: string) => wrapper
+      .findAll('.flex.items-center.justify-between.gap-4')
+      .find(detail => detail.find('span').text() === label)
+      ?.findAll('span')[1]
+      .text()
+
+    expect(detailValue('Image Input Cost')).toBe('$7.500000')
+    expect(detailValue('Image Output Cost')).toBe('$2.500000')
+    expect(detailValue('Image input price')).toBe('$5000000.0000 / 1M tokens')
+    expect(detailValue('Image output price')).toBe('$2500000.0000 / 1M tokens')
   })
 
   it('shows requested and upstream models separately for admin rows', () => {

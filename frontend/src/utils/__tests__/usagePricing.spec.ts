@@ -29,6 +29,23 @@ describe('usagePricing', () => {
     expect(calculateTokenPricePerMillion(usage.input_cost, 2)).toBeCloseTo(5000000)
   })
 
+  it('includes image token costs when deriving the usage discount multiplier', () => {
+    const usage = {
+      input_cost: 10,
+      output_cost: 20,
+      cache_creation_cost: 5,
+      cache_read_cost: 5,
+      image_input_cost: 15,
+      image_output_cost: 5,
+      total_cost: 30,
+    }
+
+    expect(resolveUsageCostDiscountMultiplier(usage)).toBeCloseTo(0.5)
+    expect(calculateDiscountedUsageCost(usage.input_cost, usage)).toBeCloseTo(5)
+    expect(calculateDiscountedUsageCost(usage.image_input_cost, usage)).toBeCloseTo(7.5)
+    expect(calculateDiscountedUsageCost(usage.image_output_cost, usage)).toBeCloseTo(2.5)
+  })
+
   it('falls back to cost divided by tokens when no unit price snapshot is provided', () => {
     expect(
       calculateTokenUnitPrice(0.5, 2)

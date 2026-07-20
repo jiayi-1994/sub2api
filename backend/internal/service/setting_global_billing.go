@@ -55,35 +55,43 @@ func (s *SettingService) GetGlobalBillingRateMultiplier(ctx context.Context) flo
 	}
 
 	result, _, _ := s.globalBillingRateSF.Do("global_billing_rate_multiplier", func() (any, error) {
+		s.globalBillingRateCacheMu.Lock()
 		if cached, ok := s.globalBillingRateCache.Load().(*cachedGlobalBillingRateMultiplier); ok && cached != nil {
 			if time.Now().UnixNano() < cached.expiresAt {
+				s.globalBillingRateCacheMu.Unlock()
 				return cached.value, nil
 			}
 		}
+		generation := s.globalBillingRateCacheGeneration
+		s.globalBillingRateCacheMu.Unlock()
+
 		if ctx == nil {
 			ctx = context.Background()
 		}
 		dbCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), globalBillingRateMultiplierDBTimeout)
 		defer cancel()
 		raw, err := s.settingRepo.GetValue(dbCtx, SettingKeyGlobalBillingRateMultiplier)
+		value := 1.0
+		ttl := globalBillingRateMultiplierCacheTTL
 		if err != nil {
-			ttl := globalBillingRateMultiplierErrorTTL
+			ttl = globalBillingRateMultiplierErrorTTL
 			if errors.Is(err, ErrSettingNotFound) {
 				ttl = globalBillingRateMultiplierCacheTTL
 			} else {
 				slog.Warn("failed to get global billing rate multiplier setting, defaulting to 1.0", "error", err)
 			}
+		} else {
+			value = parseGlobalBillingRateMultiplier(raw)
+		}
+
+		s.globalBillingRateCacheMu.Lock()
+		if generation == s.globalBillingRateCacheGeneration {
 			s.globalBillingRateCache.Store(&cachedGlobalBillingRateMultiplier{
-				value:     1.0,
+				value:     value,
 				expiresAt: time.Now().Add(ttl).UnixNano(),
 			})
-			return 1.0, nil
 		}
-		value := parseGlobalBillingRateMultiplier(raw)
-		s.globalBillingRateCache.Store(&cachedGlobalBillingRateMultiplier{
-			value:     value,
-			expiresAt: time.Now().Add(globalBillingRateMultiplierCacheTTL).UnixNano(),
-		})
+		s.globalBillingRateCacheMu.Unlock()
 		return value, nil
 	})
 	if value, ok := result.(float64); ok {

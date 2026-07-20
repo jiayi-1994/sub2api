@@ -11,6 +11,8 @@ interface UsageCostDiscountContext {
   output_cost?: number | null
   cache_creation_cost?: number | null
   cache_read_cost?: number | null
+  image_input_cost?: number | null
+  image_output_cost?: number | null
   total_cost?: number | null
 }
 
@@ -66,6 +68,8 @@ export function resolveUsageCostDiscountMultiplier(context: UsageCostDiscountCon
     context.output_cost,
     context.cache_creation_cost,
     context.cache_read_cost,
+    context.image_input_cost,
+    context.image_output_cost,
   ]
     .filter(isFiniteNumber)
     .reduce((sum, value) => sum + value, 0)

@@ -9,6 +9,7 @@ import (
 	"math"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
@@ -19,6 +20,18 @@ import (
 type settingUpdateRepoStub struct {
 	updates        map[string]string
 	setMultipleErr error
+}
+
+type globalBillingRaceRepoStub struct {
+	*settingUpdateRepoStub
+	getValueStarted chan struct{}
+	releaseGetValue chan struct{}
+}
+
+func (s *globalBillingRaceRepoStub) GetValue(context.Context, string) (string, error) {
+	close(s.getValueStarted)
+	<-s.releaseGetValue
+	return "0.5", nil
 }
 
 func (s *settingUpdateRepoStub) Get(ctx context.Context, key string) (*Setting, error) {
@@ -51,6 +64,40 @@ func (s *settingUpdateRepoStub) GetAll(ctx context.Context) (map[string]string, 
 
 func (s *settingUpdateRepoStub) Delete(ctx context.Context, key string) error {
 	panic("unexpected Delete call")
+}
+
+func TestSettingService_UpdateSettings_InFlightGlobalBillingReadCannotOverwriteCache(t *testing.T) {
+	repo := &globalBillingRaceRepoStub{
+		settingUpdateRepoStub: &settingUpdateRepoStub{},
+		getValueStarted:       make(chan struct{}),
+		releaseGetValue:       make(chan struct{}),
+	}
+	svc := NewSettingService(repo, &config.Config{})
+
+	readDone := make(chan float64, 1)
+	go func() {
+		readDone <- svc.GetGlobalBillingRateMultiplier(context.Background())
+	}()
+
+	select {
+	case <-repo.getValueStarted:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for the stale GetValue call to start")
+	}
+
+	err := svc.UpdateSettings(context.Background(), &SystemSettings{
+		GlobalBillingRateMultiplier: 0.8,
+	})
+	close(repo.releaseGetValue)
+	require.NoError(t, err)
+
+	select {
+	case <-readDone:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for the stale GetValue call to finish")
+	}
+
+	require.InDelta(t, 0.8, svc.GetGlobalBillingRateMultiplier(context.Background()), 1e-12)
 }
 
 type settingGetAllRepoStub struct {

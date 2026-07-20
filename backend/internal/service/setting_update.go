@@ -516,10 +516,13 @@ func (s *SettingService) refreshCachedSettings(settings *SystemSettings) {
 	}
 
 	s.globalBillingRateSF.Forget("global_billing_rate_multiplier")
+	s.globalBillingRateCacheMu.Lock()
+	s.globalBillingRateCacheGeneration++
 	s.globalBillingRateCache.Store(&cachedGlobalBillingRateMultiplier{
 		value:     normalizeGlobalBillingRateMultiplier(settings.GlobalBillingRateMultiplier),
 		expiresAt: time.Now().Add(globalBillingRateMultiplierCacheTTL).UnixNano(),
 	})
+	s.globalBillingRateCacheMu.Unlock()
 
 	// 先使 inflight singleflight 失效，再刷新缓存，缩小旧值覆盖新值的竞态窗口
 	versionBoundsSF.Forget("version_bounds")

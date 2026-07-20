@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -72,8 +73,10 @@ type SettingService struct {
 	openAIQuotaAutoPauseSettingsCache atomic.Value // *cachedOpenAIQuotaAutoPauseSettings
 	openAIQuotaAutoPauseSettingsSF    singleflight.Group
 
-	globalBillingRateCache atomic.Value // *cachedGlobalBillingRateMultiplier
-	globalBillingRateSF    singleflight.Group
+	globalBillingRateCache           atomic.Value // *cachedGlobalBillingRateMultiplier
+	globalBillingRateSF              singleflight.Group
+	globalBillingRateCacheMu         sync.Mutex
+	globalBillingRateCacheGeneration uint64
 }
 
 // DefaultPlatformQuotaSetting 单 platform 三档限额（nil = 沿用上层；0 = 显式禁用；>0 = 上限）
