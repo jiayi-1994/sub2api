@@ -3855,28 +3855,7 @@
                     {{ t("admin.settings.defaults.defaultBalanceHint") }}
                   </p>
                 </div>
-                <div>
-                  <label
-                    class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    {{ t("admin.settings.defaults.globalBillingRateMultiplier") }}
-                  </label>
-                  <input
-                    v-model.number="form.global_billing_rate_multiplier"
-                    type="number"
-                    step="0.0001"
-                    min="0"
-                    class="input"
-                    placeholder="1"
-                  />
-                  <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    {{
-                      t(
-                        "admin.settings.defaults.globalBillingRateMultiplierHint",
-                      )
-                    }}
-                  </p>
-                </div>
+                <!-- 全局计费折扣倍率不在 UI 暴露：值仍随表单回填/提交保留，调整走管理 API（PUT /admin/settings 的 global_billing_rate_multiplier） -->
                 <div>
                   <label
                     class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
