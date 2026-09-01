@@ -14,6 +14,42 @@ import (
 	"time"
 )
 
+func TestChannelMonitorProbeTimeoutBudget(t *testing.T) {
+	if monitorRequestTimeout != 60*time.Second {
+		t.Fatalf("monitorRequestTimeout = %s, want 60s", monitorRequestTimeout)
+	}
+	if monitorResponseHeaderTimeout != monitorRequestTimeout {
+		t.Fatalf(
+			"monitorResponseHeaderTimeout = %s, want %s",
+			monitorResponseHeaderTimeout,
+			monitorRequestTimeout,
+		)
+	}
+	if monitorDegradedThreshold != 15*time.Second {
+		t.Fatalf("monitorDegradedThreshold = %s, want 15s", monitorDegradedThreshold)
+	}
+}
+
+func TestFinalizeOperationalOrDegradedUsesFifteenSecondThreshold(t *testing.T) {
+	tests := []struct {
+		name       string
+		latency    time.Duration
+		wantStatus string
+	}{
+		{name: "below threshold", latency: 15*time.Second - time.Millisecond, wantStatus: MonitorStatusOperational},
+		{name: "at threshold", latency: 15 * time.Second, wantStatus: MonitorStatusDegraded},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := finalizeOperationalOrDegraded(&CheckResult{}, tt.latency, int(tt.latency/time.Millisecond))
+			if result.Status != tt.wantStatus {
+				t.Fatalf("status = %s, want %s", result.Status, tt.wantStatus)
+			}
+		})
+	}
+}
+
 // swapMonitorHTTPClient 临时替换 monitorHTTPClient 为不带 SSRF 校验的普通 client，
 // 让 httptest (127.0.0.1) 能连通。测试结束后恢复。
 func swapMonitorHTTPClient(t *testing.T) {
