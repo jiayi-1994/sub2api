@@ -746,33 +746,7 @@ func UsageLogFromService(l *service.UsageLog) *UsageLog {
 		return nil
 	}
 	u := usageLogFromServiceUser(l)
-	foldGlobalDiscountIntoComponents(&u)
 	return &u
-}
-
-// foldGlobalDiscountIntoComponents scales the per-component costs so they sum
-// to total_cost. Components are stored at list price while total_cost already
-// carries the hidden global billing discount; returning both to an end user
-// would let them recover the discount with one division. Admin responses keep
-// the raw components on purpose: the admin usage tooltip derives the discount
-// from that very gap. No-op for undiscounted rows (image / per-request / video
-// billing, or multiplier 1.0) and for rows without a component breakdown.
-func foldGlobalDiscountIntoComponents(u *UsageLog) {
-	sum := u.InputCost + u.OutputCost + u.CacheCreationCost + u.CacheReadCost +
-		u.ImageInputCost + u.ImageOutputCost
-	if sum <= 0 || u.TotalCost <= 0 {
-		return
-	}
-	m := u.TotalCost / sum
-	if m == 1 {
-		return
-	}
-	u.InputCost *= m
-	u.OutputCost *= m
-	u.CacheCreationCost *= m
-	u.CacheReadCost *= m
-	u.ImageInputCost *= m
-	u.ImageOutputCost *= m
 }
 
 // UsageLogFromServiceAdmin converts a service UsageLog to DTO for admin users.
