@@ -170,6 +170,7 @@ type SystemSettings struct {
 	GlobalBillingRateMultiplier  float64
 	RiskControlEnabled           bool
 	CyberSessionBlockEnabled     bool
+	CyberPolicyUserAllowlist     string
 	CyberSessionBlockTTLSeconds  int
 	AffiliateEnabled             bool
 	AffiliateRebateRate          float64
