@@ -128,6 +128,33 @@ func TestCompatibleImagesForwardGemini(t *testing.T) {
 	}
 }
 
+func TestCompatibleImagesAPIKeyAccountMappingAllowsProviderModelName(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	// Compatible relays expose their own model names (no gpt-image- prefix).
+	// The public alias stays validated and billed; the mapped upstream name is
+	// forwarded as-is.
+	credentials := map[string]any{
+		"api_key":       "image-key",
+		"base_url":      "https://compatible.example/v1",
+		"model_mapping": map[string]any{"gpt-image-2.5-flare": "Image-2.5-Flare"},
+	}
+	body := []byte(`{"model":"gpt-image-2.5-flare","prompt":"draw","size":"1024x1024"}`)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, openAIImagesGenerationsEndpoint, bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	upstream := &httpUpstreamRecorder{resp: &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"data":[{"b64_json":"aW1hZ2U="}]}`))}}
+	svc := &OpenAIGatewayService{cfg: &config.Config{}, httpUpstream: upstream}
+	parsed, err := svc.ParseOpenAIImagesRequest(c, body)
+	require.NoError(t, err)
+	result, err := svc.ForwardImages(c.Request.Context(), c, &Account{ID: 1, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Credentials: credentials}, body, parsed, "")
+	require.NoError(t, err)
+	require.Equal(t, "gpt-image-2.5-flare", result.Model)
+	require.Equal(t, "Image-2.5-Flare", result.UpstreamModel)
+	require.Equal(t, "Image-2.5-Flare", gjson.GetBytes(upstream.lastBody, "model").String())
+	require.Equal(t, "https://compatible.example"+openAIImagesGenerationsEndpoint, upstream.lastReq.URL.String())
+}
+
 func TestCompatibleImagesNativeAccountsRejectGeminiBeforeForwarding(t *testing.T) {
 	for _, typ := range []string{AccountTypeOAuth, AccountTypeSetupToken} {
 		for _, mapping := range []bool{false, true} {

@@ -638,10 +638,12 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 	if err := validateCompatibleImagesModel(requestModel); err != nil {
 		return nil, err
 	}
+	// Only the public model is validated: it drives pricing, capability and
+	// rate-limit policy. The account-mapped upstream name is provider-specific
+	// (e.g. "Image-2.5-Flare" on a compatible relay) and only replaces the model
+	// field in the forwarded body, so it must not be forced into the gpt-image-
+	// namespace.
 	upstreamModel := account.GetMappedModel(requestModel)
-	if err := validateCompatibleImagesModel(upstreamModel); err != nil {
-		return nil, err
-	}
 	SetOpsUpstreamModel(c, upstreamModel)
 	logger.LegacyPrintf(
 		"service.openai_gateway",
