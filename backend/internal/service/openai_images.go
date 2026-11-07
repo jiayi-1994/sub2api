@@ -767,6 +767,7 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 					ImageEndpoint:    true,
 					ImageCount:       streamCount,
 					ImageSize:        parsed.SizeTier,
+					ImageQuality:     parsed.Quality,
 					ImageInputSize:   parsed.Size,
 					ImageOutputSizes: streamSizes,
 				}, err
@@ -790,6 +791,7 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 			ImageEndpoint:    true,
 			ImageCount:       imageCount,
 			ImageSize:        parsed.SizeTier,
+			ImageQuality:     parsed.Quality,
 			ImageInputSize:   parsed.Size,
 			ImageOutputSizes: imageOutputSizes,
 		}, nil
@@ -813,6 +815,7 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 			ImageEndpoint:    true,
 			ImageCount:       imageCount,
 			ImageSize:        parsed.SizeTier,
+			ImageQuality:     parsed.Quality,
 			ImageInputSize:   parsed.Size,
 			ImageOutputSizes: nonStreamSizes,
 		}, nil

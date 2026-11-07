@@ -782,7 +782,7 @@ func (s *OpenAIGatewayService) calculateOpenAIImageCost(
 		gid := apiKey.Group.ID
 		cost, err := s.billingService.CalculateCostUnified(CostInput{
 			Ctx: ctx, Model: billingModel, GroupID: &gid, Group: apiKey.Group,
-			RequestCount: result.ImageCount, SizeTier: sizeTier,
+			RequestCount: result.ImageCount, SizeTier: sizeTier, QualityTier: result.ImageQuality,
 			RateMultiplier: multiplier, Resolver: s.resolver, Resolved: resolved,
 			ReasoningEffort: optionalStringValue(result.ReasoningEffort),
 		})
@@ -811,6 +811,7 @@ func (s *OpenAIGatewayService) calculateOpenAIImageCost(
 			Group:           apiKey.Group,
 			RequestCount:    result.ImageCount,
 			SizeTier:        sizeTier,
+			QualityTier:     result.ImageQuality,
 			ReasoningEffort: optionalStringValue(result.ReasoningEffort),
 			RateMultiplier:  multiplier,
 			Resolver:        s.resolver,

@@ -1991,6 +1991,7 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 					ImageEndpoint:                 true,
 					ImageCount:                    imageCount,
 					ImageSize:                     parsed.SizeTier,
+					ImageQuality:                  parsed.Quality,
 					ImageInputSize:                parsed.Size,
 					ImageOutputSizes:              imageOutputSizes,
 				}, err
@@ -2042,6 +2043,7 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 		ImageEndpoint:                 true,
 		ImageCount:                    imageCount,
 		ImageSize:                     parsed.SizeTier,
+		ImageQuality:                  parsed.Quality,
 		ImageInputSize:                parsed.Size,
 		ImageOutputSizes:              imageOutputSizes,
 	}, nil

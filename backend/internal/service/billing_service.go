@@ -1542,6 +1542,7 @@ type CostInput struct {
 	RequestCount              int     // 按次计费时使用
 	UsageUnits                float64 // 音频等连续计量单位（分钟/小时/百万字符）
 	SizeTier                  string  // 按次/图片模式的层级标签（"1K","2K","4K","HD" 等）
+	QualityTier               string  // 图片 quality 参数（low/medium/high…）；按次模式先按该标签查档，再按 SizeTier
 	RateMultiplier            float64
 	PricingAt                 time.Time             // 渠道分时定价使用的计费时刻
 	ServiceTier               string                // "priority","flex","" 等
@@ -1831,7 +1832,11 @@ func (s *BillingService) calculatePerRequestCost(resolved *ResolvedPricing, inpu
 
 	var unitPrice float64
 
-	if input.SizeTier != "" {
+	// quality 档优先于尺寸档：上游（如 xinfeng -02 系列）按 quality=low / 其余 定价，与尺寸无关。
+	if quality := strings.ToLower(strings.TrimSpace(input.QualityTier)); quality != "" {
+		unitPrice = input.Resolver.GetRequestTierPrice(resolved, quality)
+	}
+	if unitPrice == 0 && input.SizeTier != "" {
 		unitPrice = input.Resolver.GetRequestTierPrice(resolved, input.SizeTier)
 	}
 

@@ -280,8 +280,10 @@ type OpenAIForwardResult struct {
 	ImageCount            int
 	// ImageEndpoint 标记请求来自专用图片端点；分组 image_count_billing 开关
 	// 只对这类请求生效，混合 Responses/Chat/WS 请求仍按 token 计费。
-	ImageEndpoint      bool
-	ImageSize          string
+	ImageEndpoint bool
+	ImageSize     string
+	// ImageQuality 是请求的 quality 参数（low/medium/high/auto…），按次定价可据此分档。
+	ImageQuality       string
 	ImageInputSize     string
 	ImageOutputSize    string
 	ImageOutputSizes   []string
