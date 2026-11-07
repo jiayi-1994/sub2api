@@ -22,7 +22,9 @@ func TestCalculatePerRequestCostQualityTierPrecedesSizeTier(t *testing.T) {
 		count               int
 		want                float64
 	}{
-		{"low quality wins over size tier", "LOW", "1K", 1, low},
+		{"low quality wins over size tier", "low", "1K", 1, low},
+		{"quality must match exactly as forwarded upstream", "LOW", "1K", 1, size1k},
+		{"whitespace variant is not the low tier", " low", "4K", 1, def},
 		{"unknown quality falls back to size tier", "high", "1K", 1, size1k},
 		{"unknown quality and size fall back to default", "high", "4K", 2, def * 2},
 		{"empty quality keeps size behaviour", "", "1K", 1, size1k},

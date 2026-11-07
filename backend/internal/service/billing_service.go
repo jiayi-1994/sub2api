@@ -1833,7 +1833,9 @@ func (s *BillingService) calculatePerRequestCost(resolved *ResolvedPricing, inpu
 	var unitPrice float64
 
 	// quality 档优先于尺寸档：上游（如 xinfeng -02 系列）按 quality=low / 其余 定价，与尺寸无关。
-	if quality := strings.ToLower(strings.TrimSpace(input.QualityTier)); quality != "" {
+	// 必须与转发给上游的原值严格相等（不做大小写/空白归一）：上游同样按原值精确比较，
+	// 若此处放宽，客户端发 "LOW" 就能在本站命中低价档而上游按高价扣费。
+	if quality := input.QualityTier; quality != "" {
 		unitPrice = input.Resolver.GetRequestTierPrice(resolved, quality)
 	}
 	if unitPrice == 0 && input.SizeTier != "" {
