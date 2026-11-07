@@ -980,6 +980,19 @@ func (s *OpenAIGatewayService) handleOpenAIImagesNonStreamingResponse(
 		return OpenAIUsage{}, 0, nil, err
 	}
 	body = s.backfillOpenAIImagesB64JSON(ctx, account, parsed, body)
+	// 上游出图超时会回 202 + 未完成任务体（无图片，上游也不计费）。原样透传的话，
+	// 计费会回退到请求 n 按张扣费、客户却拿不到图；写回前转成请求级临时故障（502、不扣费、
+	// 不计入账号健康），客户端重试即可。
+	if resp.StatusCode == http.StatusAccepted && extractOpenAIImageCountFromJSONBytes(body) == 0 {
+		return OpenAIUsage{}, 0, nil, &UpstreamFailoverError{
+			StatusCode:             http.StatusBadGateway,
+			ResponseHeaders:        resp.Header.Clone(),
+			ResponseBody:           body,
+			RequestScopedTransient: true,
+			Scope:                  GatewayFailureScopeRequest,
+			NextAccountAction:      NextAccountRetry,
+		}
+	}
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 	contentType := "application/json"
 	if s.cfg != nil && !s.cfg.Security.ResponseHeaders.Enabled {
